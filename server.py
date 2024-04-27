@@ -31,15 +31,6 @@ class FileStorageServicer(file_storage_pb2_grpc.FileStorageServicer):
         self.reply_received = [False] * num_nodes
         self.request_lock = threading.Lock()
 
-    def save_files_to_disk(self):
-        with open(self.files_path, "w") as f:
-            json.dump(self.files, f, indent=4)
-
-    def update_request_sequence_number(self):
-        with self.request_lock:
-            self.request_sequence_number += 1
-            return self.request_sequence_number
-
     def acquire_lock(self):
         with self.request_lock:
             self.using = True
@@ -54,6 +45,11 @@ class FileStorageServicer(file_storage_pb2_grpc.FileStorageServicer):
 
         while self.reply_count < self.num_nodes - 1:
             pass
+
+    def update_request_sequence_number(self):
+        with self.request_lock:
+            self.request_sequence_number += 1
+            return self.request_sequence_number
 
     def send_request(self, node, sequence_number):
         request = file_storage_pb2.MutexRequest(
@@ -76,7 +72,7 @@ class FileStorageServicer(file_storage_pb2_grpc.FileStorageServicer):
             stub = file_storage_pb2_grpc.FileStorageStub(channel)
             stub.RequestContentProviderMutex(request)
 
-    def RequestContentProviderMutex(self, request):
+    def RequestContentProviderMutex(self, request, context):
         with self.request_lock:
             self.request_sequence_number = max(
                 self.request_sequence_number, request.sequence_number)
@@ -84,11 +80,11 @@ class FileStorageServicer(file_storage_pb2_grpc.FileStorageServicer):
                 self.reply_received[request.node_id] = False
             else:
                 self.reply_received[request.node_id] = True
-
-            if self.using or (self.pending_requests[request.node_id] != 0 and self.pending_requests[request.node_id] < request.sequence_number) or (self.pending_requests[request.node_id] == request.sequence_number and self.node_id < request.node_id):
-                self.send_reply(request.node_id)
-            else:
-                self.pending_requests[request.node_id] = request.sequence_number
+            if (request.node_id < len(self.pending_requests)):
+                if self.using or (self.pending_requests[request.node_id] != 0 and self.pending_requests[request.node_id] < request.sequence_number) or (self.pending_requests[request.node_id] == request.sequence_number and self.node_id < request.node_id):
+                    self.send_reply(request.node_id)
+                else:
+                    self.pending_requests[request.node_id] = request.sequence_number
 
         return file_storage_pb2.MutexResponse(granted=True)
 
@@ -99,19 +95,23 @@ class FileStorageServicer(file_storage_pb2_grpc.FileStorageServicer):
             stub = file_storage_pb2_grpc.FileStorageStub(channel)
             stub.RequestContentProviderMutex(request)
 
-    def calculate_file_hash(self, data):
-        return hashlib.sha256(data).hexdigest()
-
-    def save_file(self, filename, data):
-        file_hash = self.calculate_file_hash(data)
+    def UploadFile(self, request, context):
+        file_hash = self.calculate_file_hash(request.data)
         if file_hash not in self.files.values():
-            with open(os.path.join(self.storage_folder, filename), "wb") as f:
-                f.write(data)
-            self.files[filename] = file_hash
+            with open(os.path.join(self.storage_folder, request.filename), "wb") as f:
+                f.write(request.data)
+            self.files[request.filename] = file_hash
             self.save_files_to_disk()
             return True  # File saved successfully
         else:
             return False  # Duplicate file found, not saved
+
+    def calculate_file_hash(self, data):
+        return hashlib.sha256(data).hexdigest()
+
+    def save_files_to_disk(self):
+        with open(self.files_path, "w") as f:
+            json.dump(self.files, f, indent=4)
 
 
 def serve(node_id, num_nodes):

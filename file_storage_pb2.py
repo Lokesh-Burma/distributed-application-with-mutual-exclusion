@@ -14,7 +14,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12\x66ile_storage.proto\")\n\x07\x43ontent\x12\x10\n\x08\x66ilename\x18\x01 \x01(\t\x12\x0c\n\x04\x64\x61ta\x18\x02 \x01(\x0c\"!\n\x0eUploadResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\"#\n\x0f\x44ownloadRequest\x12\x10\n\x08\x66ilename\x18\x01 \x01(\t\"8\n\x0cMutexRequest\x12\x17\n\x0fsequence_number\x18\x01 \x01(\x05\x12\x0f\n\x07node_id\x18\x02 \x01(\x05\" \n\rMutexResponse\x12\x0f\n\x07granted\x18\x01 \x01(\x08\x32\xd3\x01\n\x0b\x46ileStorage\x12\'\n\nUploadFile\x12\x08.Content\x1a\x0f.UploadResponse\x12*\n\x0c\x44ownloadFile\x12\x10.DownloadRequest\x1a\x08.Content\x12<\n\x1bRequestContentProviderMutex\x12\r.MutexRequest\x1a\x0e.MutexResponse\x12\x31\n\x10RequestUserMutex\x12\r.MutexRequest\x1a\x0e.MutexResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12\x66ile_storage.proto\")\n\x07\x43ontent\x12\x10\n\x08\x66ilename\x18\x01 \x01(\t\x12\x0c\n\x04\x64\x61ta\x18\x02 \x01(\x0c\"!\n\x0eUploadResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\"#\n\x0f\x44ownloadRequest\x12\x10\n\x08\x66ilename\x18\x01 \x01(\t\"8\n\x0cMutexRequest\x12\x17\n\x0fsequence_number\x18\x01 \x01(\x05\x12\x0f\n\x07node_id\x18\x02 \x01(\x05\" \n\rMutexResponse\x12\x0f\n\x07granted\x18\x01 \x01(\x08\x32\xa0\x01\n\x0b\x46ileStorage\x12\'\n\nUploadFile\x12\x08.Content\x1a\x0f.UploadResponse\x12*\n\x0c\x44ownloadFile\x12\x10.DownloadRequest\x1a\x08.Content\x12<\n\x1bRequestContentProviderMutex\x12\r.MutexRequest\x1a\x0e.MutexResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,5 +32,5 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _globals['_MUTEXRESPONSE']._serialized_start=195
   _globals['_MUTEXRESPONSE']._serialized_end=227
   _globals['_FILESTORAGE']._serialized_start=230
-  _globals['_FILESTORAGE']._serialized_end=441
+  _globals['_FILESTORAGE']._serialized_end=390
 # @@protoc_insertion_point(module_scope)

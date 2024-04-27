@@ -25,7 +25,8 @@ class ContentProviderClient:
 
     def request_mutex(self):
         request = file_storage_pb2.MutexRequest(
-            sequence_number=0, node_id=self.node_id)
+            sequence_number=1, node_id=1)
+        print(f"requesting mutex, {request}")
         response = self.stub.RequestContentProviderMutex(request)
         return response.granted
 
