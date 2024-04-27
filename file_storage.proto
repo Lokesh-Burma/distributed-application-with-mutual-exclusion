@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+service FileStorage {
+    rpc UploadFile(Content) returns (UploadResponse);
+    rpc DownloadFile(DownloadRequest) returns (Content);
+    rpc RequestContentProviderMutex(MutexRequest) returns (MutexResponse);
+}
+
+message Content {
+    string filename = 1;
+    bytes data = 2;
+}
+
+message UploadResponse {
+    bool success = 1;
+}
+
+message DownloadRequest {
+    string filename = 1;
+}
+
+message MutexRequest {
+    int32 sequence_number = 1;
+    int32 node_id = 2;
+}
+
+message MutexResponse {
+    bool granted = 1;
+}
