@@ -14,6 +14,16 @@ class FileStorageStub(object):
         Args:
             channel: A grpc.Channel.
         """
+        self.RequestMutex = channel.unary_unary(
+                '/FileStorage/RequestMutex',
+                request_serializer=file__storage__pb2.RequestMutexParams.SerializeToString,
+                response_deserializer=file__storage__pb2.MutexResponse.FromString,
+                )
+        self.ReleaseMutex = channel.unary_unary(
+                '/FileStorage/ReleaseMutex',
+                request_serializer=file__storage__pb2.ReleaseMutexParams.SerializeToString,
+                response_deserializer=file__storage__pb2.MutexResponse.FromString,
+                )
         self.UploadFile = channel.unary_unary(
                 '/FileStorage/UploadFile',
                 request_serializer=file__storage__pb2.Content.SerializeToString,
@@ -24,15 +34,22 @@ class FileStorageStub(object):
                 request_serializer=file__storage__pb2.DownloadRequest.SerializeToString,
                 response_deserializer=file__storage__pb2.Content.FromString,
                 )
-        self.RequestContentProviderMutex = channel.unary_unary(
-                '/FileStorage/RequestContentProviderMutex',
-                request_serializer=file__storage__pb2.MutexRequest.SerializeToString,
-                response_deserializer=file__storage__pb2.MutexResponse.FromString,
-                )
 
 
 class FileStorageServicer(object):
     """Missing associated documentation comment in .proto file."""
+
+    def RequestMutex(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ReleaseMutex(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
 
     def UploadFile(self, request, context):
         """Missing associated documentation comment in .proto file."""
@@ -46,15 +63,19 @@ class FileStorageServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def RequestContentProviderMutex(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
 
 def add_FileStorageServicer_to_server(servicer, server):
     rpc_method_handlers = {
+            'RequestMutex': grpc.unary_unary_rpc_method_handler(
+                    servicer.RequestMutex,
+                    request_deserializer=file__storage__pb2.RequestMutexParams.FromString,
+                    response_serializer=file__storage__pb2.MutexResponse.SerializeToString,
+            ),
+            'ReleaseMutex': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReleaseMutex,
+                    request_deserializer=file__storage__pb2.ReleaseMutexParams.FromString,
+                    response_serializer=file__storage__pb2.MutexResponse.SerializeToString,
+            ),
             'UploadFile': grpc.unary_unary_rpc_method_handler(
                     servicer.UploadFile,
                     request_deserializer=file__storage__pb2.Content.FromString,
@@ -65,11 +86,6 @@ def add_FileStorageServicer_to_server(servicer, server):
                     request_deserializer=file__storage__pb2.DownloadRequest.FromString,
                     response_serializer=file__storage__pb2.Content.SerializeToString,
             ),
-            'RequestContentProviderMutex': grpc.unary_unary_rpc_method_handler(
-                    servicer.RequestContentProviderMutex,
-                    request_deserializer=file__storage__pb2.MutexRequest.FromString,
-                    response_serializer=file__storage__pb2.MutexResponse.SerializeToString,
-            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             'FileStorage', rpc_method_handlers)
@@ -79,6 +95,40 @@ def add_FileStorageServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class FileStorage(object):
     """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def RequestMutex(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/FileStorage/RequestMutex',
+            file__storage__pb2.RequestMutexParams.SerializeToString,
+            file__storage__pb2.MutexResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def ReleaseMutex(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/FileStorage/ReleaseMutex',
+            file__storage__pb2.ReleaseMutexParams.SerializeToString,
+            file__storage__pb2.MutexResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def UploadFile(request,
@@ -111,22 +161,5 @@ class FileStorage(object):
         return grpc.experimental.unary_unary(request, target, '/FileStorage/DownloadFile',
             file__storage__pb2.DownloadRequest.SerializeToString,
             file__storage__pb2.Content.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def RequestContentProviderMutex(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/FileStorage/RequestContentProviderMutex',
-            file__storage__pb2.MutexRequest.SerializeToString,
-            file__storage__pb2.MutexResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

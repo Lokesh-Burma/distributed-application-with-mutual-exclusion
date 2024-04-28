@@ -1,2 +1,5 @@
 .vscode/
 __pycache__/
+old_files/
+received-files-from-content-provider/
+file_info.json

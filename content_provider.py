@@ -1,76 +1,74 @@
-# content_provider.py
+import os
 import grpc
-import sys
-import time
-import file_storage_pb2
 import file_storage_pb2_grpc
-import random
-
-_ONE_DAY_IN_SECONDS = 60 * 60 * 24
+import file_storage_pb2
+import sys
 
 
 class ContentProviderClient:
-    def __init__(self, node_id, num_nodes):
-        self.node_id = node_id
-        self.num_nodes = num_nodes
+    def __init__(self, process_id):
+        self.process_id = process_id
+        self.token = -1
 
     def connect_to_server(self, server_address):
         self.channel = grpc.insecure_channel(server_address)
         self.stub = file_storage_pb2_grpc.FileStorageStub(self.channel)
+        print(
+            f"Process {self.process_id} connected to server at {server_address}")
+
+    def request_mutex(self):
+        request = file_storage_pb2.RequestMutexParams(
+            process_id=self.process_id, token=self.token)
+        response = self.stub.RequestMutex(request)
+        print(f"Process {self.process_id} got mutex: {response.granted}")
+        return response.granted
+
+    def release_mutex(self):
+        request = file_storage_pb2.ReleaseMutexParams(
+            process_id=self.process_id)
+        response = self.stub.ReleaseMutex(request)
+        print(f"Process {self.process_id} released mutex: {response.granted}")
+        return response.granted
 
     def upload_file(self, filename, data):
         request = file_storage_pb2.Content(filename=filename, data=data)
         response = self.stub.UploadFile(request)
+        if response.success:
+            print(
+                f"Process {os.getpid()} uploaded file '{filename}' successfully")
+        else:
+            print(
+                f"Process {os.getpid()} failed to upload file '{filename}', {response.error}")
         return response.success
-
-    def request_mutex(self):
-        request = file_storage_pb2.MutexRequest(
-            sequence_number=1, node_id=1)
-        print(f"requesting mutex, {request}")
-        response = self.stub.RequestContentProviderMutex(request)
-        return response.granted
-
-    def release_mutex(self):
-        request = file_storage_pb2.MutexRequest(
-            sequence_number=0, node_id=self.node_id)
-        response = self.stub.ReleaseContentProviderMutex(request)
-        return response.granted
 
 
 def main():
-    num_nodes = 2  # number of Content Providers in the node
-    node_id = random.randint(0, num_nodes - 1)
-    server_address = 'localhost:5005' + \
-        str(node_id)  # Update with the server address
-    print(f"Node {node_id} connecting to server at {server_address}")
-    content_provider = ContentProviderClient(node_id, num_nodes)
+    env = 'local'  # for debugging
+    server_ip = '192.137.12.12:50051'
+    server_address = 'localhost:50051' if env == 'local' else server_ip
+
+    content_provider = ContentProviderClient(os.getpid())
     content_provider.connect_to_server(server_address)
 
-    # Check if filename and content string are provided as command-line arguments
-    if len(sys.argv) != 3:
+    if (len(sys.argv) != 3):
         print("Usage: python content_provider.py <filename> <content>")
-        # sys.exit(1)
-    # sys.argv[1] = "file1.txt"
-    # sys.argv[2] = "Hello World!"
-    filename = "file1.txt"  # sys.argv[1]
-    content = "Hello World!"  # sys.argv[2]
+
+    filename = sys.argv[1] if sys.argv[1] else "file1.txt"
+    content = sys.argv[2] if sys.argv[2] else "Hello World"
 
     try:
-        # Acquire mutex before uploading file
-        mutex_granted = content_provider.request_mutex()
-        if mutex_granted:
-            data = content.encode()  # Convert content string to bytes
-            success = content_provider.upload_file(filename, data)
-            if success:
-                print(f"File '{filename}' uploaded successfully")
+        mutex_granted = False
+        while not mutex_granted:
+            mutex_granted = content_provider.request_mutex()
+            if mutex_granted:
+                data = content.encode('utf-8')
+                content_provider.upload_file(filename, data)
+                content_provider.release_mutex()
             else:
-                print(f"Failed to upload file '{filename}' (duplicate file)")
-            # Release mutex after uploading file
-            content_provider.release_mutex()
-        else:
-            print("Failed to acquire mutex")
+                print(
+                    f"Process {os.getpid()} failed to acquire mutex for file '{filename}', retrying...")
     except KeyboardInterrupt:
-        pass
+        print(f"Process {os.getpid()} interrupted")
 
 
 if __name__ == '__main__':
