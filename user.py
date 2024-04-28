@@ -36,7 +36,7 @@ def main():
         print(f"Contents of file '{filename}':")
         print(data)
     except grpc.RpcError as e:
-        print(f"Failed to download file '{filename}': {e.details()}")
+        print(f"Failed to download file '{filename}'")
 
 
 if __name__ == '__main__':
