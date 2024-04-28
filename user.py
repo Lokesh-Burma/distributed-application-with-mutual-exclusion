@@ -7,7 +7,7 @@ import file_storage_pb2_grpc
 
 class UserClient:
     def __init__(self):
-        server_address = 'localhost:50051'
+        server_address = '172.31.12.146:50051'
         self.channel = grpc.insecure_channel(server_address)
         self.stub = file_storage_pb2_grpc.FileStorageStub(self.channel)
 
