@@ -1,18 +1,18 @@
 import grpc
 from concurrent.futures import ThreadPoolExecutor
-import hashlib
-import json
-import os
-import time
-import file_storage_pb2
 import file_storage_pb2_grpc
+import file_storage_pb2
+import os
+import json
 import threading
-
-_ONE_DAY_IN_SECONDS = 60 * 60 * 24
+import hashlib
 
 
 class FileStorageServicer(file_storage_pb2_grpc.FileStorageServicer):
-    def __init__(self, node_id, num_nodes):
+    def __init__(self):
+        self.isCriticalSectionInUse = False
+        self.lock = threading.Lock()
+        self.pending_requests = []
         self.storage_folder = "received-files-from-content-provider"
         self.files_path = "file_info.json"
         if not os.path.exists(self.storage_folder):
@@ -22,120 +22,84 @@ class FileStorageServicer(file_storage_pb2_grpc.FileStorageServicer):
                 self.files = json.load(f)
         else:
             self.files = {}
-        self.request_sequence_number = 0
-        self.reply_count = 0
-        self.node_id = node_id
-        self.num_nodes = num_nodes
-        self.using = False
-        self.pending_requests = []
-        self.reply_received = [False] * num_nodes
-        self.request_lock = threading.Lock()
 
-    def acquire_lock(self):
-        with self.request_lock:
-            self.using = True
-            self.reply_count = 0
-            self.request_sequence_number = self.update_request_sequence_number()
-            self.pending_requests = [
-                self.request_sequence_number] * self.num_nodes
+    def RequestMutex(self, request, context):
+        print(
+            f"Process {request.process_id} requested mutex, with token {request.token}")
+        try:
+            if request.process_id not in self.pending_requests:
+                self.pending_requests.append(request.process_id)
+                print(
+                    f"Process {request.process_id} added to pending requests")
 
-        for node in range(self.num_nodes):
-            if node != self.node_id:
-                self.send_request(node, self.request_sequence_number)
+            if (self.pending_requests[0] == request.process_id and not self.isCriticalSectionInUse):
+                self.lock.acquire()
+                self.isCriticalSectionInUse = True
+                print(
+                    f"Process {request.process_id} acquired mutex")
+                return file_storage_pb2.MutexResponse(granted=True, token=0)
 
-        while self.reply_count < self.num_nodes - 1:
-            pass
-
-    def update_request_sequence_number(self):
-        with self.request_lock:
-            self.request_sequence_number += 1
-            return self.request_sequence_number
-
-    def send_request(self, node, sequence_number):
-        request = file_storage_pb2.MutexRequest(
-            sequence_number=sequence_number, node_id=self.node_id)
-        with grpc.insecure_channel(f'localhost:5005{node}') as channel:
-            stub = file_storage_pb2_grpc.FileStorageStub(channel)
-            stub.RequestContentProviderMutex(request)
-
-    def release_lock(self):
-        self.using = False
-        self.reply_received = [False] * self.num_nodes
-        for node in range(self.num_nodes):
-            if node != self.node_id and self.pending_requests[node] != 0:
-                self.send_release(node)
-
-    def send_release(self, node):
-        request = file_storage_pb2.MutexRequest(
-            sequence_number=0, node_id=self.node_id)
-        with grpc.insecure_channel(f'localhost:5005{node}') as channel:
-            stub = file_storage_pb2_grpc.FileStorageStub(channel)
-            stub.RequestContentProviderMutex(request)
-
-    def RequestContentProviderMutex(self, request, context):
-        with self.request_lock:
-            self.request_sequence_number = max(
-                self.request_sequence_number, request.sequence_number)
-            if request.sequence_number == 0:
-                self.reply_received[request.node_id] = False
             else:
-                self.reply_received[request.node_id] = True
-            if (request.node_id < len(self.pending_requests)):
-                if self.using or (self.pending_requests[request.node_id] != 0 and self.pending_requests[request.node_id] < request.sequence_number) or (self.pending_requests[request.node_id] == request.sequence_number and self.node_id < request.node_id):
-                    self.send_reply(request.node_id)
-                else:
-                    self.pending_requests[request.node_id] = request.sequence_number
+                print(
+                    f"Critical section is in use, Process {request.process_id} denied mutex")
+                return file_storage_pb2.MutexResponse(granted=False, token=self.getToken(request.process_id))
+        except Exception as e:
+            print(e)
+            return file_storage_pb2.MutexResponse(granted=False, token=self.getToken(request.process_id))
 
+    def getToken(self, process_id):
+        return self.pending_requests.index(process_id)
+
+    def ReleaseMutex(self, request, context):
+        self.isCriticalSectionInUse = False
+        self.lock.release()
+        if len(self.pending_requests) != 0:
+            self.pending_requests.pop(0)
+        print(
+            f"Process {request.process_id} released mutex")
         return file_storage_pb2.MutexResponse(granted=True)
-
-    def send_reply(self, node):
-        request = file_storage_pb2.MutexRequest(
-            sequence_number=0, node_id=self.node_id)
-        with grpc.insecure_channel(f'localhost:5005{node}') as channel:
-            stub = file_storage_pb2_grpc.FileStorageStub(channel)
-            stub.RequestContentProviderMutex(request)
 
     def UploadFile(self, request, context):
         file_hash = self.calculate_file_hash(request.data)
         if file_hash not in self.files.values():
-            with open(os.path.join(self.storage_folder, request.filename), "wb") as f:
+            with open(f"{self.storage_folder}/{request.filename}", "wb") as f:
                 f.write(request.data)
             self.files[request.filename] = file_hash
-            self.save_files_to_disk()
-            return True  # File saved successfully
+            self.save_files_info()
+            print(f"File {request.filename} uploaded successfully")
+            return file_storage_pb2.UploadResponse(success=True, error="")
         else:
-            return False  # Duplicate file found, not saved
+            print(f"File {request.filename} already exists")
+            return file_storage_pb2.UploadResponse(success=False, error="File already exists")
 
     def calculate_file_hash(self, data):
         return hashlib.sha256(data).hexdigest()
 
-    def save_files_to_disk(self):
+    def save_files_info(self):
         with open(self.files_path, "w") as f:
-            json.dump(self.files, f, indent=4)
+            json.dump(self.files, f)
 
-
-def serve(node_id, num_nodes):
-    server = grpc.server(ThreadPoolExecutor(max_workers=10))
-    file_storage_pb2_grpc.add_FileStorageServicer_to_server(
-        FileStorageServicer(node_id, num_nodes), server)
-    server.add_insecure_port(f'localhost:5005{node_id}')
-    server.start()
-    print(f"Server {node_id} started at port localhost:5005{node_id}")
-    try:
-        while True:
-            time.sleep(_ONE_DAY_IN_SECONDS)
-    except KeyboardInterrupt:
-        print("Server shutting down, due to interrupt")
-        server.stop(0)
+    def DownloadFile(self, request, context):
+        print(f"Received Download file request {request.filename}")
+        if request.filename in self.files:
+            with open(f"{self.storage_folder}/{request.filename}", "rb") as f:
+                data = f.read()
+            print(f"File {request.filename} transffered successfully")
+            return file_storage_pb2.Content(filename=request.filename, data=data)
+        else:
+            print(f"File {request.filename} does not exist")
+            return file_storage_pb2.Content(filename=request.filename, data=b"")
 
 
 if __name__ == '__main__':
-    num_nodes = 3  # Change this according to the number of nodes in the system
-    threads = []
-    for node_id in range(num_nodes):
-        thread = threading.Thread(target=serve, args=(node_id, num_nodes))
-        threads.append(thread)
-        thread.start()
+    env = 'local'  # for debugging
+    server_ip = '192.137.12.12:50051'
+    server_address = 'localhost:50051' if env == 'local' else server_ip
 
-    for thread in threads:
-        thread.join()
+    server = grpc.server(ThreadPoolExecutor(max_workers=10))
+    file_storage_pb2_grpc.add_FileStorageServicer_to_server(
+        FileStorageServicer(), server)
+    server.add_insecure_port(server_address)
+    server.start()
+    print(f"Server started listening at port {server_address}")
+    server.wait_for_termination()
