@@ -18,11 +18,14 @@ This distributed file storage application enables multiple client nodes to uploa
 
 ## Building and Running
 
-1. Use the Python gRPC tools to generate the protobuf and gRPC code.
-   `python3.9 -m grpc_tools.protoc -I . --python_out=. --grpc_python_out=. file_storage.proto`
-2. Run Server
-   `python3.9 server.py`
-3. Run Content Provider to generate file and store it in server
-   `python3.9 content_provider.py filename.txt "hello world"`
-4. Run User to download file from server
-   `python3.9 user.py filename.txt`
+1. Install grpcio and grpcio-tools.
+   - `pip install grpcio`
+   - `pip install grpcio-tools`
+2. Use the Python gRPC tools to generate the protobuf and gRPC code.
+   - `python3.9 -m grpc_tools.protoc -I . --python_out=. --grpc_python_out=. file_storage.proto`
+3. Run Server
+   - `python3.9 server.py`
+4. Run Content Provider to generate file and store it in server
+   - `python3.9 content_provider.py filename.txt "hello world"`
+5. Run User to download file from server
+   - `python3.9 user.py filename.txt`

@@ -3,6 +3,7 @@ import grpc
 import file_storage_pb2_grpc
 import file_storage_pb2
 import sys
+import time
 
 
 class ContentProviderClient:
@@ -43,15 +44,14 @@ class ContentProviderClient:
 
 
 def main():
-    env = 'local'  # for debugging
-    server_ip = '192.137.12.12:50051'
-    server_address = 'localhost:50051' if env == 'local' else server_ip
+    server_address = '172.31.12.146:50051'  # 'localhost:50051 for local testing'
 
     content_provider = ContentProviderClient(os.getpid())
     content_provider.connect_to_server(server_address)
 
     if (len(sys.argv) != 3):
         print("Usage: python content_provider.py <filename> <content>")
+        exit()
 
     filename = sys.argv[1] if sys.argv[1] else "file1.txt"
     content = sys.argv[2] if sys.argv[2] else "Hello World"
@@ -66,7 +66,8 @@ def main():
                 content_provider.release_mutex()
             else:
                 print(
-                    f"Process {os.getpid()} failed to acquire mutex for file '{filename}', retrying...")
+                    f"Process {os.getpid()} failed to acquire mutex for file '{filename}', retrying after 15 seconds...")
+                time.sleep(15)
     except KeyboardInterrupt:
         print(f"Process {os.getpid()} interrupted")
 

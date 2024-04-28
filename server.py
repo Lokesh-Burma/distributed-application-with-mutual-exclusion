@@ -6,6 +6,7 @@ import os
 import json
 import threading
 import hashlib
+import time
 
 
 class FileStorageServicer(file_storage_pb2_grpc.FileStorageServicer):
@@ -25,7 +26,7 @@ class FileStorageServicer(file_storage_pb2_grpc.FileStorageServicer):
 
     def RequestMutex(self, request, context):
         print(
-            f"Process {request.process_id} requested mutex, with token {request.token}")
+            f"\nProcess {request.process_id} requested mutex, with token {request.token}")
         try:
             if request.process_id not in self.pending_requests:
                 self.pending_requests.append(request.process_id)
@@ -56,21 +57,25 @@ class FileStorageServicer(file_storage_pb2_grpc.FileStorageServicer):
         if len(self.pending_requests) != 0:
             self.pending_requests.pop(0)
         print(
-            f"Process {request.process_id} released mutex")
+            f"Process {request.process_id} released mutex\n")
         return file_storage_pb2.MutexResponse(granted=True)
 
     def UploadFile(self, request, context):
         file_hash = self.calculate_file_hash(request.data)
-        if file_hash not in self.files.values():
+        if file_hash not in self.files.values() and request.filename not in self.files.keys():
+            time.sleep(60)
             with open(f"{self.storage_folder}/{request.filename}", "wb") as f:
                 f.write(request.data)
             self.files[request.filename] = file_hash
             self.save_files_info()
             print(f"File {request.filename} uploaded successfully")
             return file_storage_pb2.UploadResponse(success=True, error="")
-        else:
-            print(f"File {request.filename} already exists")
-            return file_storage_pb2.UploadResponse(success=False, error="File already exists")
+        elif request.filename in self.files.keys():
+            print(f"file with same name already exists")
+            return file_storage_pb2.UploadResponse(success=False, error="file with same name already exists")
+        elif file_hash in self.files.values():
+            print(f"file with same text data already exists")
+            return file_storage_pb2.UploadResponse(success=False, error="file with same text data already exists")
 
     def calculate_file_hash(self, data):
         return hashlib.sha256(data).hexdigest()
@@ -82,19 +87,18 @@ class FileStorageServicer(file_storage_pb2_grpc.FileStorageServicer):
     def DownloadFile(self, request, context):
         print(f"Received Download file request {request.filename}")
         if request.filename in self.files:
+            time.sleep(60)
             with open(f"{self.storage_folder}/{request.filename}", "rb") as f:
                 data = f.read()
-            print(f"File {request.filename} transffered successfully")
+            print(f"File {request.filename} transferred successfully\n")
             return file_storage_pb2.Content(filename=request.filename, data=data)
         else:
-            print(f"File {request.filename} does not exist")
-            return file_storage_pb2.Content(filename=request.filename, data=b"")
+            print(f"File {request.filename} does not exist\n")
+            return file_storage_pb2.Content(filename=request.filename, data="")
 
 
 if __name__ == '__main__':
-    env = 'local'  # for debugging
-    server_ip = '192.137.12.12:50051'
-    server_address = 'localhost:50051' if env == 'local' else server_ip
+    server_address = '172.31.12.146:50051'  # 'localhost:50051' for local testing
 
     server = grpc.server(ThreadPoolExecutor(max_workers=10))
     file_storage_pb2_grpc.add_FileStorageServicer_to_server(
